@@ -19,6 +19,7 @@ import {
   tap,
 } from 'rxjs/operators';
 
+import logger from './logger';
 import AudioControl from './MeetingsSDKAdapter/controls/AudioControl';
 import ExitControl from './MeetingsSDKAdapter/controls/ExitControl';
 import JoinControl from './MeetingsSDKAdapter/controls/JoinControl';
@@ -1019,8 +1020,15 @@ export default class MeetingsSDKAdapter extends MeetingsAdapter {
       const sdkMeeting = this.fetchMeeting(ID);
       const getMeeting$ = Observable.create((observer) => {
         if (this.meetings[ID]) {
+          logger.debug({
+            resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: 'emit meeting',
+          });
           observer.next(this.meetings[ID]);
         } else {
+          // logger.debug(`meeting not found in "${ID}"`);
+          logger.debug({
+            resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: `meeting not found in "${ID}"`,
+          });
           observer.error(new Error(`Could not find meeting with ID "${ID}"`));
         }
 
@@ -1029,40 +1037,84 @@ export default class MeetingsSDKAdapter extends MeetingsAdapter {
 
       const meetingUpdateEvent$ = fromEvent(sdkMeeting, EVENT_MEETING_UPDATED).pipe(
         tap((meeting) => {
+          logger.debug({
+            resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: 'meeting update event',
+          });
           this.meetings[ID] = meeting;
         }),
       );
 
       const meetingWithMediaReadyEvent$ = fromEvent(sdkMeeting, EVENT_MEDIA_READY).pipe(
+        tap(() => {
+          logger.debug({
+            resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: 'meeting with media ready event',
+          });
+        }),
         filter((event) => MEDIA_EVENT_TYPES.includes(event.type)),
         map((event) => this.attachMedia(ID, event)),
       );
 
       const meetingWithMediaStoppedEvent$ = fromEvent(sdkMeeting, EVENT_MEDIA_STOPPED).pipe(
-        tap(() => this.removeMedia(ID)),
+        tap(() => {
+          logger.debug({
+            resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: 'meeting with media stopped event',
+          });
+          this.removeMedia(ID);
+        }),
       );
 
       const meetingWithMediaShareEvent$ = fromEvent(sdkMeeting, EVENT_REMOTE_SHARE_START).pipe(
-        tap(() => this.attachMedia(ID, {type: EVENT_REMOTE_SHARE_START})),
+        tap(() => {
+          logger.debug({
+            resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: 'meeting with media share event',
+          });
+          this.attachMedia(ID, {type: EVENT_REMOTE_SHARE_START});
+        }),
       );
 
       const meetingWithMediaStoppedShareEvent$ = fromEvent(sdkMeeting, EVENT_REMOTE_SHARE_STOP)
         .pipe(
-          tap(() => this.attachMedia(ID, {type: EVENT_REMOTE_SHARE_STOP})),
+          tap(() => {
+            logger.debug({
+              resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: 'meeting with media stopped share event',
+            });
+            this.attachMedia(ID, {type: EVENT_REMOTE_SHARE_STOP});
+          }),
         );
 
       const meetingWithLocalShareStoppedEvent$ = fromEvent(sdkMeeting, EVENT_LOCAL_SHARE_STOP).pipe(
         tap(() => {
+          logger.debug({
+            resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: 'meeting with local share stopped event',
+          });
           this.stopStream(this.meetings[ID].localShare.stream);
           this.meetings[ID].localShare.stream = null;
         }),
       );
 
-      const meetingWithLocalUpdateEvent$ = fromEvent(sdkMeeting, EVENT_MEDIA_LOCAL_UPDATE);
+      const meetingWithLocalUpdateEvent$ = fromEvent(sdkMeeting, EVENT_MEDIA_LOCAL_UPDATE).pipe(
+        tap(() => {
+          logger.debug({
+            resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: 'meeting with local update event',
+          });
+        }),
+      );
 
-      const meetingWithSwitchCameraEvent$ = fromEvent(sdkMeeting, EVENT_CAMERA_SWITCH);
+      const meetingWithSwitchCameraEvent$ = fromEvent(sdkMeeting, EVENT_CAMERA_SWITCH).pipe(
+        tap(() => {
+          logger.debug({
+            resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: 'meeting with switch camera event',
+          });
+        }),
+      );
 
-      const meetingWithSwitchMicrophoneEvent$ = fromEvent(sdkMeeting, EVENT_MICROPHONE_SWITCH);
+      const meetingWithSwitchMicrophoneEvent$ = fromEvent(sdkMeeting, EVENT_MICROPHONE_SWITCH).pipe(
+        tap(() => {
+          logger.debug({
+            resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: 'meeting with switch microphone event',
+          });
+        }),
+      );
 
       const meetingStateChange$ = fromEvent(sdkMeeting, EVENT_STATE_CHANGE).pipe(
         tap((event) => {
@@ -1070,8 +1122,14 @@ export default class MeetingsSDKAdapter extends MeetingsAdapter {
           let state;
 
           if (sdkState === 'ACTIVE') {
+            logger.debug({
+              resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: 'meeting state change active',
+            });
             state = MeetingState.JOINED;
           } else if (sdkState === 'INACTIVE') {
+            logger.debug({
+              resourceType: 'MEETING', resourceID: ID, action: 'getMeeting()', message: 'meeting state change inactive',
+            });
             state = MeetingState.LEFT;
           } else {
             state = this.meetings[ID].state;
